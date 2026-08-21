@@ -13,6 +13,7 @@
 // System headers
 #include <iostream>
 #include <stdexcept>
+#include <cmath>
 
 #ifdef HAS_RNTUPLE_SUPPORT
 // ROOT headers for RNTuple support
@@ -994,122 +995,309 @@ Int_t QwBeamLine::LoadInputParameters(TString pedestalfile)
 }
 
 
-//*****************************************************************//
-/** Randomize event data for all managed devices for mock runs. */
+//======================================================================
+// Randomize event data for all managed devices for mock runs. //
+
+//======================================================================
+
 void QwBeamLine::RandomizeEventData(int helicity, double time)
 {
-	Double_t Xtrimcoefficient = 1; //dummy practice value
-	Double_t Xptrimcoefficient = 1.5e-2; //dummy practice value
-	Double_t Xkick, Xpkick, rampvalue, trimvalue;
 
-  // Randomize all QwBPMStripline buffers
-  for (size_t i = 0; i < fStripline.size(); i++)
-  {
-    fStripline[i].get()->RandomizeEventData(helicity, time);
-     // fStripline[i].get()->PrintInfo();
+  //====================================================================
+  //  CLOCK
+  //  QwMockDataGenerator.cc sets time = event * GetWindowPeriod() and
+  //  randomizes the array once per event, so a change in "time" is a
+  //  new event regardless of how many beamline subsystems exist.
+  //====================================================================
+
+  static const Bool_t bmodDebugClock = kFALSE;   // print the first 20 calls
+
+  static Long64_t bmodCallCounter  = -1;
+  static Long64_t bmodEventCounter = -1;
+  static Double_t bmodLastTime     = -1.0e300;
+  static Double_t bmodWindowPeriod = 0.0;        // seconds, measured from "time"
+
+  bmodCallCounter++;
+
+  if (time != bmodLastTime) {
+    if (bmodEventCounter >= 0 && bmodWindowPeriod <= 0.0)
+      bmodWindowPeriod = time - bmodLastTime;
+    bmodEventCounter++;
+    bmodLastTime = time;
   }
+
+  if (bmodDebugClock && bmodCallCounter < 20) {
+    std::cout << "[bmod] call " << bmodCallCounter
+              << "  time= "     << time
+              << "  event= "    << bmodEventCounter << std::endl;
+  }
+
+
+  //====================================================================
+  // MODULATION CYCLE DEFINITION
+  //
+  //  The schedule, smallest unit first:
+  //
+  //     8 events      = 1 sine period
+  //     5 periods     = 1 coil segment      =   40 events
+  //     7 coils       = 1 driven cycle      =  280 events
+  //     + 40 idle     = 1 full cycle        =  320 events
+  //     6 cycles                            = 1920 events
+  //     + 80 idle     = 1 SUPERCYCLE        = 2000 events
+  //
+  //====================================================================
+
+  static const Int_t bmodWinPerPeriod    = 8;    // events per sine period
+  static const Int_t bmodPeriodsPerCoil  = 5;    // = BMWmax_period
+  static const Int_t bmodNCoils          = 7;    // bmod_trim1 .. bmod_trim7
+  static const Int_t bmodCyclesPerSuper  = 6;    // rows in the PREX grid plot
+
+  static const Int_t bmodWinPerCoil      = bmodWinPerPeriod * bmodPeriodsPerCoil;   //   40
+  static const Int_t bmodDrivenPerCycle  = bmodNCoils * bmodWinPerCoil;             //  280
+  static const Int_t bmodIdlePerCycle    = 40;                                      //   40
+  static const Int_t bmodWinPerCycle     = bmodDrivenPerCycle + bmodIdlePerCycle;   //  320
+  static const Int_t bmodIdlePerSuper    = 80;                                      //   80
+  static const Int_t bmodSuperCycle      = bmodCyclesPerSuper * bmodWinPerCycle
+                                         + bmodIdlePerSuper;                        // 2000
+
+  // --- drive amplitude per coil, ADC counts ---------------------------
+  //  1700 +/- 500 keeps every DAC between 1200 and 2200.
+  static const Double_t bmodCoilAmp[bmodNCoils] =
+    { 500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 150.0 };
+
+  
+  static const Double_t bmodPositionScale = 1.0e-4;   // mm per ADC count
+  static const Double_t bmodSlopeScale    = 1.0e-5;   // slope per ADC count
+  static const Double_t bmodCoilResponse[bmodNCoils][4] = {
+    //   x      y      x'     y'
+    { -1.00,  0.10,  0.80,  0.05 },   // coil 1  horizontal
+    {  0.15,  1.00,  0.10, -0.90 },   // coil 2  vertical
+    { -0.80, -0.15, -1.00,  0.10 },   // coil 3  horizontal
+    {  0.05,  0.90,  0.05,  1.00 },   // coil 4  vertical
+    {  1.20,  0.20,  0.50,  0.10 },   // coil 5  horizontal
+    {  0.20, -1.10,  0.10,  0.60 },   // coil 6  vertical
+    {  0.60,  0.05,  0.30,  0.05 }    // coil 7  energy
+  };
+
+  // --- parked values, ADC counts (match mock_parameters_beamline.map) --
+  static const Double_t bmodTrimParked = 1.7e3;
+  static const Double_t bmodRampParked = -65.0;
+  static const Double_t bmodRampSpan   = 1360.0;
+
+
+  //====================================================================
+  //  Three nested divisions: supercycle -> cycle -> coil -> phase.
+  //====================================================================
+
+  const Int_t bmodWinInSuper = static_cast<Int_t>(bmodEventCounter % bmodSuperCycle);
+
+  Bool_t bmodIsOn       = kFALSE;   // is anything modulating this event?
+  Int_t  bmodCoil       = -1;       // 0..6 internally, 1..7 in BMWobj
+  Int_t  bmodPhaseStep  = 0;        // 0..7 within the sine period
+  Int_t  bmodCycleInSup = -1;       // 0..5
+
+  if (bmodWinInSuper < bmodCyclesPerSuper * bmodWinPerCycle) {
+    bmodCycleInSup = bmodWinInSuper / bmodWinPerCycle;             // which of the 6
+    const Int_t winInCycle = bmodWinInSuper % bmodWinPerCycle;     // 0..319
+    if (winInCycle < bmodDrivenPerCycle) {                         // not the 40 idle
+      bmodIsOn     = kTRUE;
+      bmodCoil     = winInCycle / bmodWinPerCoil;                  // 0..6
+      bmodPhaseStep = winInCycle % bmodWinPerPeriod;               // 0..7
+    }
+  }
+  // else: the 80-event idle tail at the end of the supercycle
+
+  //  global cycle number, 1-based, the row label in the PREX grid plot
+  const Long64_t bmodCycleNumber =
+      (bmodEventCounter / bmodSuperCycle) * bmodCyclesPerSuper
+    + (bmodCycleInSup >= 0 ? bmodCycleInSup : bmodCyclesPerSuper - 1) + 1;
+
+  // print the schedule once, so nothing about the timing is a guess
+  static Bool_t bmodPrintedTiming = kFALSE;
+  if (!bmodPrintedTiming && bmodWindowPeriod > 0.0) {
+    std::cout << "[bmod] window period = " << bmodWindowPeriod << " s ("
+              << 1.0/bmodWindowPeriod << " Hz helicity rate)\n"
+              << "[bmod] " << bmodWinPerPeriod << " events/period => modulation at "
+              << 1.0/(bmodWinPerPeriod*bmodWindowPeriod) << " Hz\n"
+              << "[bmod] " << bmodWinPerCoil    << " events/coil, "
+                           << bmodWinPerCycle   << " events/cycle, "
+                           << bmodCyclesPerSuper << " cycles/supercycle, "
+                           << bmodSuperCycle    << " events/supercycle"
+              << std::endl;
+    bmodPrintedTiming = kTRUE;
+  }
+
+
+  //====================================================================
+  //THIS EVENT'S TRIM AND RAMP VALUES
+  //  Exactly one coil is driven; the other six stay parked.
+  //====================================================================
+
+  Double_t bmodTrimValue[bmodNCoils];
+  for (Int_t c = 0; c < bmodNCoils; c++) bmodTrimValue[c] = bmodTrimParked;
+
+  Double_t bmodRampValue = bmodRampParked;
+  Double_t bmodSine      = 0.0;    // -1 .. +1
+  Double_t bmodDrive     = 0.0;    // ADC counts of deviation on the driven coil
+
+  if (bmodIsOn) {
+    const Double_t bmodTwoPi = 6.283185307179586;
+
+    // sample at the centre of the window, times the integrating-ADC
+    // window-averaging factor sin(pi/N)/(pi/N)
+    const Double_t bmodPhase  = bmodTwoPi * (bmodPhaseStep + 0.5) / bmodWinPerPeriod;
+    const Double_t bmodWinAvg = std::sin(bmodTwoPi / (2.0 * bmodWinPerPeriod))
+                              / (bmodTwoPi / (2.0 * bmodWinPerPeriod));
+    bmodSine  = std::sin(bmodPhase) * bmodWinAvg;
+    bmodDrive = bmodCoilAmp[bmodCoil] * bmodSine;
+
+    Double_t v = bmodTrimParked + bmodDrive;
+    if (v < 0.0) { v = 0.0; bmodDrive = -bmodTrimParked; }   // DAC floor
+    bmodTrimValue[bmodCoil] = v;
+
+    bmodRampValue = bmodRampParked
+                  + bmodRampSpan * (bmodPhaseStep + 0.5) / bmodWinPerPeriod;
+  }
+
+
+  //====================================================================
+  //  bmwobj / bmwcoil1 / bmwamp1 hold the LAST-moved coil through idle
+  //====================================================================
+
+  static Int_t    bmwLastCoil = 0;      // 1..7
+  static Double_t bmwLastAmp  = 0.0;
+
+  if (bmodIsOn) {
+    bmwLastCoil = bmodCoil + 1;
+    bmwLastAmp  = bmodCoilAmp[bmodCoil];
+  }
+
+  static const Int_t bmodNFlagWords = 11;
+  static const TString bmwName[bmodNFlagWords] = {
+    "bmwphase", "bmwperiod", "bmwobj",  "bmwfreq",      "bmwcycnum",
+    "bmwcoil1", "bmwamp1",   "bmwcoil2","bmwamp2",
+    "bmwmax_period", "bmwffb_pause"
+  };
+
+  Double_t bmwValue[bmodNFlagWords];
+  bmwValue[0]  = bmodIsOn ? bmodPhaseStep : 0;                     // bmwphase
+  bmwValue[1]  = bmodWinPerPeriod;                                 // bmwperiod
+  bmwValue[2]  = bmwLastCoil;                                      // bmwobj  = coil 1..7
+  bmwValue[3]  = (bmodWindowPeriod > 0.0)                          // bmwfreq [Hz]
+               ? 1.0/(bmodWinPerPeriod*bmodWindowPeriod) : 0.0;
+  bmwValue[4]  = static_cast<Double_t>(bmodCycleNumber);           // bmwcycnum = CYCLE
+  bmwValue[5]  = bmwLastCoil;                                      // bmwcoil1
+  bmwValue[6]  = bmwLastAmp;                                       // bmwamp1
+  bmwValue[7]  = 0;                                                // bmwcoil2 (unused: one coil at a time)
+  bmwValue[8]  = 0;                                                // bmwamp2
+  bmwValue[9]  = bmodPeriodsPerCoil;                               // bmwmax_period
+  bmwValue[10] = bmodIsOn ? 1 : 0;                                 // bmwffb_pause
+
+
+  //====================================================================
+  // STRIPLINES AND CAVITIES        (unchanged from upstream)
+  //====================================================================
+
+  for (size_t i = 0; i < fStripline.size(); i++)
+    fStripline[i].get()->RandomizeEventData(helicity, time);
 
   for (size_t i = 0; i < fCavity.size(); i++)
     fCavity[i].RandomizeEventData(helicity, time);
 
-  // Randomize all QwBCM buffers
-  for (size_t i = 0; i < fBCM.size(); i++)
-  {	
-   
-   	fBCM[i].get()->RandomizeEventData(helicity, time);
-    //fBCM[i].get()->PrintInfo(); 
-         
-   	//-------------------Beam modulation: modulate ramp and trim cards----------------------
-   // if(time == 1000){
-   trimvalue = 1;  
-    	//std::cout << fBCM[i].get()->GetElementName() << std::endl;
-    	if(fBCM[i].get()->GetElementName().Contains("bmod_ramp")){
-    		rampvalue = fBCM[i].get()->GetValue();
-    		rampvalue = 100.0; //100 is a dummy practice value, should be calculated based on a sine curve (or does ramp follow trim?)
-    		fBCM[i].get()->SetRandomEventParameters(rampvalue, fBCM[i].get()->GetValueWidth());
-    	}
-    	//testing by changing only trim1
-    	if(fBCM[i].get()->GetElementName().Contains("bmod_trim1")){
-    		 // 130 is a practice dummy, should be related to the ramp value (or does ramp follow trim?)
-     		fBCM[i].get()->SetRandomEventParameters(trimvalue, fBCM[i].get()->GetValueWidth());
-     		//trimvalue = fBCM[i].get()->GetValue();
-     	}
-     //}
-     fBCM[i].get()->RandomizeEventData(helicity, time);
-     //-------------------Beam modulation: end the code crimes (for now)---------------------
-  
-  
-    if(fBCM[i].get()->GetElementName().Contains("bmod_trim1")){std::cout << fBCM[i].get()->GetValue() << std::endl;}
 
+  //====================================================================
+  // BCMs: TRIM CARDS, RAMP, AND THE BMW FLAG WORDS
+  //====================================================================
+
+  for (size_t i = 0; i < fBCM.size(); i++) {
+
+    const TString bmodName = fBCM[i].get()->GetElementName();
+
+    if (bmodName == "bmod_ramp") {
+      fBCM[i].get()->SetRandomEventParameters(bmodRampValue,
+                                              fBCM[i].get()->GetValueWidth());
+    }
+    else if (bmodName.BeginsWith("bmod_trim")) {
+      for (Int_t c = 0; c < bmodNCoils; c++) {
+        if (bmodName == Form("bmod_trim%d", c + 1)) {
+          fBCM[i].get()->SetRandomEventParameters(bmodTrimValue[c],
+                                                  fBCM[i].get()->GetValueWidth());
+          break;
+        }
+      }
+    }
+    else if (bmodName.BeginsWith("bmw")) {
+      for (Int_t w = 0; w < bmodNFlagWords; w++) {
+        if (bmodName == bmwName[w]) {
+          fBCM[i].get()->SetRandomEventParameters(bmwValue[w], 0.0);  // flags carry no jitter
+          break;
+        }
+      }
+    }
+
+    fBCM[i].get()->RandomizeEventData(helicity, time);
   }
 
-  // Randomize all QwHaloMonitor buffers
-  //for (size_t i = 0; i < fHaloMonitor.size(); i++)
-    //fHaloMonitor[i].RandomizeEventData(helicity, time);
 
-//-------------------------------------------------------------------------------------------
-  for(size_t i=0;i<fBCMCombo.size();i++){
+  //====================================================================
+  //  COMBINED BCMs                  (unchanged from upstream)
+  //====================================================================
+
+  for (size_t i = 0; i < fBCMCombo.size(); i++) {
     fBCMCombo[i].get()->RandomizeEventData(helicity, time);
-    for (size_t j=0; j<fBCMCombo[i].get()->GetNumberOfElements(); j++){
-      VQwBCM * bcm = GetBCM(fBCMCombo[i].get()->GetSubElementName(j));
-      if (bcm){
-        fBCMCombo[i].get()->GetProjectedCharge(bcm);
-      }
+    for (size_t j = 0; j < fBCMCombo[i].get()->GetNumberOfElements(); j++) {
+      VQwBCM *bcm = GetBCM(fBCMCombo[i].get()->GetSubElementName(j));
+      if (bcm) fBCMCombo[i].get()->GetProjectedCharge(bcm);
     }
   }
-//-------------------------------------------------------------------------------------------
-  for (size_t i=0; i<fBPMCombo.size(); i++){
+
+
+  //====================================================================
+  //  COMBINED BPMs: APPLY THE DRIVEN COIL'S KICK
+ 
+  //====================================================================
+
+  for (size_t i = 0; i < fBPMCombo.size(); i++) {
+
     fBPMCombo[i].get()->RandomizeEventData(helicity, time);
-    //fBPMCombo[i].get()->PrintValue();
-    
-    //-------------------Beam modulation II: code crimes continue----------------------------
-    Xkick = trimvalue*Xtrimcoefficient;
-    Xpkick = trimvalue*Xptrimcoefficient; //not sure what to do with this right now
-    
-    //back propogate beam position to fBPMs???? how do i use the Xkick to shift x beam position????
-		
-		//std::cout << "Xkick " << Xkick << std::endl;
-		//std::cout << "Xpkick " << Xpkick << std::endl;
-		
-		fBPMCombo[i].get()->addMockOffset(1,Xkick);
-		//fBPMCombo[i].get()->addMockOffset(3,Xpkick);
-		
-		fBPMCombo[i].get()->reCalcIntercept();
-    //------------------ Beam modulation: end the code crimes--------------------------------
-    
-    for (size_t j=0; j<fBPMCombo[i].get()->GetNumberOfElements(); j++){
-      VQwBPM * bpm = GetBPMStripline(fBPMCombo[i].get()->GetSubElementName(j));
-      //bpm->fAbsPos[0]->AddChannelOffset(Xkick);
-      if (bpm){
-        fBPMCombo[i].get()->GetProjectedPosition(bpm);
-//  print the bpm device name, and get the x and y and z? values and print them
-      //std::cout << "bpm " << bpm->GetElementName() << std::endl;
-      //std::cout << "xpos= " << bpm->GetPosition(VQwBPM::kXAxis) << std::endl;
-      //std::cout << "ypos= " << bpm->GetPosition(VQwBPM::kYAxis) << std::endl;
-      //std::cout << "zpos= " << bpm->GetPosition(VQwBPM::kZAxis) << std::endl;
-        //bpm->PrintInfo();
-        //  Call the new function in stripline class to fill all internal variables from the fAbsPos for the bpm object
-      }
+
+    if (bmodIsOn) {
+      const Double_t kickX  = bmodCoilResponse[bmodCoil][0] * bmodDrive * bmodPositionScale;
+      const Double_t kickY  = bmodCoilResponse[bmodCoil][1] * bmodDrive * bmodPositionScale;
+      const Double_t kickXp = bmodCoilResponse[bmodCoil][2] * bmodDrive * bmodSlopeScale;
+      const Double_t kickYp = bmodCoilResponse[bmodCoil][3] * bmodDrive * bmodSlopeScale;
+
+      fBPMCombo[i].get()->addMockOffset(1, kickX);    // -> fAbsPos[0], x
+      fBPMCombo[i].get()->addMockOffset(2, kickY);    // -> fAbsPos[1], y
+      fBPMCombo[i].get()->addMockOffset(3, kickXp);   // -> fSlope[0],  x'
+      fBPMCombo[i].get()->addMockOffset(4, kickYp);   // -> fSlope[1],  y'
+
+      fBPMCombo[i].get()->reCalcIntercept();
+      
+      for (size_t j = 0; j < fStripline.size(); j++) {
+      fBPMCombo[i].get()->GetProjectedPosition(fStripline[j].get());
+    }
+    }
+
+    for (size_t j = 0; j < fBPMCombo[i].get()->GetNumberOfElements(); j++) {
+      VQwBPM *bpm = GetBPMStripline(fBPMCombo[i].get()->GetSubElementName(j));
+      if (bpm) fBPMCombo[i].get()->GetProjectedPosition(bpm);
     }
   }
-//-------------------------------------------------------------------------------------------
-  for (size_t i=0;i<fECalculator.size();i++)
-  {
-   fECalculator[i].RandomizeEventData(helicity, time);
-   //fECalculator[i].PrintValue();
-   for (size_t j=0; j<fECalculator[i].GetNumberOfElements(); j++)
-    {
-      // std::cout << "In loop over ec subelements; device name = " << fECalculator[i].GetSubElementName(j) << std::endl;
-      VQwBPM * bpm = GetBPMStripline(fECalculator[i].GetSubElementName(j));
-      if (bpm)
-      {
-        fECalculator[i].GetProjectedPosition(bpm);
-      }
+
+
+  //====================================================================
+  // ENERGY CALCULATORS   
+  //====================================================================
+
+  for (size_t i = 0; i < fECalculator.size(); i++) {
+    fECalculator[i].RandomizeEventData(helicity, time);
+    for (size_t j = 0; j < fECalculator[i].GetNumberOfElements(); j++) {
+      VQwBPM *bpm = GetBPMStripline(fECalculator[i].GetSubElementName(j));
+      if (bpm) fECalculator[i].GetProjectedPosition(bpm);
     }
   }
 }
-
-
 //*****************************************************************//
 /**
  * Serialize active element buffers into a CODA-style bank/subbank layout and
