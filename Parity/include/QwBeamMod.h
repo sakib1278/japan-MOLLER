@@ -32,6 +32,28 @@ class QwBeamMod;
 // this emun vector needs to be coherent with the DetectorTypes declaration in the QwBeamLine constructor
 
 
+class QwBPMTansferMatrix {
+	public:
+		QwBPMTansferMatrix(){};
+		~QwBPMTansferMatrix(){};
+		TString GetElementName();
+		Double_t GetTMatrixElement(Int_t i);
+		void LoadMockDataParameters();
+		void SetElementName(TString bpmName);
+		void SetTMatrixElement(Int_t i, Double_t value);
+	protected:
+	private:
+		TString name = "unknown";
+		Double_t TMatrixElement[10] = {0,0,0,0,0,0,0,0,0,0};
+}; 
+ 
+class QwTargetTrimResponse : public QwBPMTansferMatrix{
+	public:
+		QwTargetTrimResponse(){};
+		~QwTargetTrimResponse(){};
+	protected:
+	private:
+}; 
 
 /*****************************************************************
 *  Class:

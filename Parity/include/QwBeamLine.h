@@ -27,7 +27,7 @@
 #include "QwLinearDiodeArray.h"
 #include "VQwClock.h"
 #include "QwBeamDetectorID.h"
-
+#include "QwBeamMod.h"
 
 /**
  * \class QwBeamLine
@@ -202,6 +202,9 @@ protected:
 
   std::vector <QwEnergyCalculator> fECalculator;
   std::vector <QwBeamDetectorID> fBeamDetectorID;
+  
+  std::vector<QwTargetTrimResponse> fTrimResponse;   // 7 entries, index = coil-1
+  std::vector<QwBPMTansferMatrix>   fBPMTransfer;    // parallel to fStripline
 
 
 
