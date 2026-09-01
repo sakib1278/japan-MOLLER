@@ -91,17 +91,13 @@ void QwBPMTansferMatrix::LoadMockDataParameters(){
     			this->SetTMatrixElement(i,mapstr.GetTypedNextToken<Double_t>());
     		}
     	}
+    	
     	if(devtype == "bpmtransfer"){
-    		for(int i = 0; i < 2; i++){
-    			this->SetTMatrixElement(i,mapstr.GetTypedNextToken<Double_t>());
-    		}
-    	}
-    	if(devtype == "bpmtransfermatrix"){
-    		for(int i = 0; i < 10; i++){
-    			this->SetTMatrixElement(i,mapstr.GetTypedNextToken<Double_t>());
-    		}
-    	}
-    	}
+    for(int i = 0; i < 10; i++){
+        this->SetTMatrixElement(i,mapstr.GetTypedNextToken<Double_t>());
+        }
+      }
+    }
     }
     
     /*

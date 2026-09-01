@@ -1,31 +1,33 @@
 !Target BPM Response to trim card values
-!device_type,	!device_name,			X,	X',	Y,	Y'	E
-bmodtargetresponse,	bmod_trim1,		-1.00,	0.800,	0.100,	0.05	0.000
-bmodtargetresponse,	bmod_trim2,		0.150,	0.100,	1.000,	-0.90	0.000
-bmodtargetresponse,	bmod_trim3,		-0.80,	-1.00,	-0.15,	0.10	0.000
-bmodtargetresponse,	bmod_trim4,		0.050,	0.050,	0.900,	1.00	0.000
-bmodtargetresponse,	bmod_trim5,		1.200,	0.500,	0.200,	0.10	0.000
-bmodtargetresponse,	bmod_trim6,		0.200,	0.100,	-1.10,	0.60	0.000
-bmodtargetresponse,	bmod_trim7,		0.600,	0.300,	0.050,	0.05	0.000
+!device_type,	!device_name,		X,	X',	Y,	Y'	E
+bmodtargetresponse,	bmod_trim1,	-1.00,	0.800,	0.100,	0.05	0.000
+bmodtargetresponse,	bmod_trim2,	0.150,	0.100,	1.000,	-0.90	0.000
+bmodtargetresponse,	bmod_trim3,	-0.80,	-1.00,	-0.15,	0.10	0.000
+bmodtargetresponse,	bmod_trim4,	0.050,	0.050,	0.900,	1.00	0.000
+bmodtargetresponse,	bmod_trim5,	1.200,	0.500,	0.200,	0.10	0.000
+bmodtargetresponse,	bmod_trim6,	0.200,	0.100,	-1.10,	0.60	0.000
+bmodtargetresponse,	bmod_trim7,	0.600,	0.300,	0.050,	0.05	0.000
 
 
 !BPM Transfer Matricies
-!device_type,	device_name,			diagonal,		(0,1) & (2,3)
-bpmtransfer,	bpm1h04,			1.000000000000000e00,	1.491388002000000e01
-bpmtransfer,	bpm1h05,			1.000000000000000e00,	1.360797002000000e01
-bpmtransfer,	bpm1h11,			1.000000000000000e00,	5.060830020000001e00
-bpmtransfer,	bpm1h14,			1.000000000000000e00,	2.104840000000000e00
+!  x_bpm = cxx*x + cxxp*x' + cxy*y + cxyp*y' + cxe*e
+!  y_bpm = cyx*x + cyxp*x' + cyy*y + cyyp*y' + cye*e
+!
+!device_type,	device_name,	cxx,	cxxp,	cxy,	cxyp,	cxe,	cyx,	cyxp,	cyy,	cyyp,	cye
+!Combined BPMs
+bpmtransfer,	bpm1h04,	1.00,	14.91,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	14.91,	0.00
+bpmtransfer,	bpm1h05,	1.00,	13.61,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	13.61,	0.00
+bpmtransfer,	bpm1h11,	1.00,	5.06,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	5.06,	0.00
+bpmtransfer,	bpm1h14,	1.00,	2.10,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	2.10,	0.00
 
-
-!The remaining striplines, full 10-element form.
-!device_type,		device_name,	cxx,	cxxp,			cxy,	cxyp,	cxe,	cyx,	cyxp,	cyy,	cyyp,			cye
-bpmtransfermatrix,	bpm1c10,	1.00,	5.800000000000000e01,	0.00,	0.00,	3.00,	0.00,	0.00,	1.00,	5.800000000000000e01,	0.00
-bpmtransfermatrix,	bpm1c11,	1.00,	5.500000000000000e01,	0.00,	0.00,	2.80,	0.00,	0.00,	1.00,	5.500000000000000e01,	0.00
-bpmtransfermatrix,	bpm1c12,	1.00,	5.200000000000000e01,	0.00,	0.00,	2.50,	0.00,	0.00,	1.00,	5.200000000000000e01,	0.00
-bpmtransfermatrix,	bpm1c16,	1.00,	4.733274304305468e01,	0.00,	0.00,	1.80,	0.00,	0.00,	1.00,	4.733274304305468e01,	0.00
-bpmtransfermatrix,	bpm1c20,	1.00,	3.805809303205470e01,	0.00,	0.00,	1.00,	0.00,	0.00,	1.00,	3.805809303205470e01,	0.00
-bpmtransfermatrix,	bpm1p02b,	1.00,	2.800000000000000e01,	0.00,	0.00,	0.20,	0.00,	0.00,	1.00,	2.800000000000000e01,	0.00
-bpmtransfermatrix,	bpm1p03a,	1.00,	2.400000000000000e01,	0.00,	0.00,	0.10,	0.00,	0.00,	1.00,	2.400000000000000e01,	0.00
-bpmtransfermatrix,	bpm1h01,	1.00,	1.900000000000000e01,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	1.900000000000000e01,	0.00
-bpmtransfermatrix,	bpm1h02,	1.00,	1.750000000000000e01,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	1.750000000000000e01,	0.00
-bpmtransfermatrix,	bpm1h03,	1.00,	1.600000000000000e01,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	1.600000000000000e01,	0.00
+!The ten striplines.
+bpmtransfer,	bpm1c10,	1.00,	58.00,	0.00,	0.00,	3.00,	0.00,	0.00,	1.00,	58.00,	0.00
+bpmtransfer,	bpm1c11,	1.00,	55.00,	0.00,	0.00,	2.80,	0.00,	0.00,	1.00,	55.00,	0.00
+bpmtransfer,	bpm1c12,	1.00,	52.00,	0.00,	0.00,	2.50,	0.00,	0.00,	1.00,	52.00,	0.00
+bpmtransfer,	bpm1c16,	1.00,	45.00,	0.00,	0.00,	1.80,	0.00,	0.00,	1.00,	45.00,	0.00
+bpmtransfer,	bpm1c20,	1.00,	38.00,	0.00,	0.00,	1.00,	0.00,	0.00,	1.00,	38.00,	0.00
+bpmtransfer,	bpm1p02b,	1.00,	28.00,	0.00,	0.00,	0.20,	0.00,	0.00,	1.00,	28.00,	0.00
+bpmtransfer,	bpm1p03a,	1.00,	24.00,	0.00,	0.00,	0.10,	0.00,	0.00,	1.00,	24.00,	0.00
+bpmtransfer,	bpm1h01,	1.00,	19.00,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	19.00,	0.00
+bpmtransfer,	bpm1h02,	1.00,	17.50,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	17.50,	0.00
+bpmtransfer,	bpm1h03,	1.00,	16.00,	0.00,	0.00,	0.00,	0.00,	0.00,	1.00,	16.00,	0.00
