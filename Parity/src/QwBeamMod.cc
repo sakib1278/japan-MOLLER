@@ -40,7 +40,10 @@ void QwBPMTansferMatrix::SetElementName(TString bpmName){
 }
 
 void QwBPMTansferMatrix::SetTMatrixElement(Int_t i, Double_t value){
-	this->TMatrixElement[i] = value;
+	if(i >= 0 && i < 10){
+		this->TMatrixElement[i] = value;
+		this->fFilled = kTRUE;
+	}
 }
 
 TString QwBPMTansferMatrix::GetElementName(){
@@ -55,8 +58,8 @@ void QwBPMTansferMatrix::LoadMockDataParameters(){
 	
 	TString mapfile = "mock_parameters_modulation.map";
 	
-  Bool_t   ldebug=kTRUE;
-  TString  devname, devtype;
+  Bool_t   ldebug=kFALSE;
+  TString  devname, devtype, rownum;
   Int_t    lineread=0;
 	//Double_t TransferMatrixElements[2] = {0,0};
 
@@ -77,37 +80,55 @@ void QwBPMTansferMatrix::LoadMockDataParameters(){
     devtype = mapstr.GetTypedNextToken<TString>();
     devtype.ToLower();
     devtype.Remove(TString::kBoth,' ');
+    
+    if (devtype == "bmodcontrolpar") continue;
     devname = mapstr.GetTypedNextToken<TString>();
     devname.ToLower();
     devname.Remove(TString::kBoth,' ');
     
     
-    if(devname == this->GetElementName()){
-    	//std::cout << devname << std::endl;
-    	//mapstr.GetNextToken();
-    	//std::cout << "next token is " << mapstr.GetTypedNextToken<Double_t>() << std::endl;
-    	if(devtype == "bmodtargetresponse"){
+    if(devname != this->GetElementName()) continue;
+    	
+    if(devtype == "bmodtargetresponse"){
     		for(int i = 0; i < 5; i++){
     			this->SetTMatrixElement(i,mapstr.GetTypedNextToken<Double_t>());
     		}
     	}
     	
-    	if(devtype == "bpmtransfer"){
-    for(int i = 0; i < 10; i++){
-        this->SetTMatrixElement(i,mapstr.GetTypedNextToken<Double_t>());
-        }
-      }
-    }
-    }
-    
-    /*
-    if(mapstr.GetLine().find(this->GetElementName())!=std::string::npos){
-		for(int i = 0; i < 2; i++){
-			mapstr.GetNextToken();
-			this->SetTMatrixElement(i,mapstr.GetTypedNextToken<Double_t>());
-			}
+    	else if (devtype == "coilamp"){
+			this->SetTMatrixElement(0, mapstr.GetTypedNextToken<Double_t>());
 		}
-		*/
+		else if (devtype == "bpmtransfermatrix"){
+			rownum = mapstr.GetTypedNextToken<TString>();
+			rownum.ToLower();
+			rownum.Remove(TString::kBoth,' ');
+ 
+			Int_t offset = -1;
+			if (rownum == "r1") offset = 0;
+			else if (rownum == "r3") offset = 5;
+ 
+			if (offset < 0){
+				QwWarning << "Unknown transfer matrix row '" << rownum
+				          << "' for " << devname << QwLog::endl;
+				continue;
+			}
+			for(int i = 0; i < 5; i++)
+				this->SetTMatrixElement(offset + i,
+				                        mapstr.GetTypedNextToken<Double_t>());
+			continue;      // a BPM has TWO lines, keep reading for the other
+		}
+		else continue;
+ 
+		if (ldebug){
+			std::cout << "QwBPMTansferMatrix: " << devname << " (" << devtype << ")";
+			for(int i = 0; i < 10; i++) std::cout << "  " << GetTMatrixElement(i);
+			std::cout << std::endl;
+		}
+		return;
+    
+    
+    }
+  
 }
 
 

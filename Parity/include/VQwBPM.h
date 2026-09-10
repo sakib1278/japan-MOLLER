@@ -86,6 +86,7 @@ class VQwBPM : public VQwDataElement {
   ~VQwBPM() override { };
 
 	virtual void addMockOffset(int index, double offset){};
+	virtual void setMockValue(int index, double value){};
 	virtual void reCalcIntercept(){};
 
   void   InitializeChannel(TString name);

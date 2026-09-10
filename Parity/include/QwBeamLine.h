@@ -76,6 +76,7 @@ class QwBeamLine : public VQwSubsystemParity, public MQwSubsystemCloneable<QwBea
   void LoadEventCuts_Fin(Int_t &eventcut_flag) override;
   Int_t  LoadGeometryDefinition(TString mapfile) override;
   void  LoadMockDataParameters(TString mapfile) override;
+  void  LoadBmodControlParameters(TString mapfile);
   void   AssignGeometry(QwParameterFile* mapstr, VQwBPM * bpm);
 
   Bool_t ApplySingleEventCuts() override;//derived from VQwSubsystemParity
@@ -205,6 +206,8 @@ protected:
   
   std::vector<QwTargetTrimResponse> fTrimResponse;   // 7 entries, index = coil-1
   std::vector<QwBPMTansferMatrix>   fBPMTransfer;    // parallel to fStripline
+  std::vector<Int_t>                fBmodControlPar; // the six schedule numbers
+  std::vector<Double_t>             fBmodCoilAmp;    // one per coil
 
 
 

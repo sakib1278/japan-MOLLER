@@ -41,10 +41,13 @@ class QwBPMTansferMatrix {
 		void LoadMockDataParameters();
 		void SetElementName(TString bpmName);
 		void SetTMatrixElement(Int_t i, Double_t value);
+		Bool_t IsFilled(){return fFilled;};
+		Bool_t IsEmpty(){return !fFilled;};
 	protected:
 	private:
 		TString name = "unknown";
 		Double_t TMatrixElement[10] = {0,0,0,0,0,0,0,0,0,0};
+		Bool_t fFilled = kFALSE;
 }; 
  
 class QwTargetTrimResponse : public QwBPMTansferMatrix{

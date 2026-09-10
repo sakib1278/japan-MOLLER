@@ -790,10 +790,24 @@ void QwBeamLine::LoadMockDataParameters(TString mapfile) {
     GetElement(GetQwBeamInstrumentType(devtype),index)->LoadMockDataParameters(mapstr);
   }
   
-   fTrimResponse.resize(7);
-  for (Int_t c = 0; c < 7; c++) {
+   //  control parameters, with the documented defaults if the record is missing from the map
+   fBmodControlPar.assign(6, 0);
+   fBmodControlPar[0] = 8;   fBmodControlPar[1] = 5;   fBmodControlPar[2] = 7;
+   fBmodControlPar[3] = 6;   fBmodControlPar[4] = 40;  fBmodControlPar[5] = 80;
+   LoadBmodControlParameters("mock_parameters_modulation.map");
+
+   fTrimResponse.resize(fBmodControlPar[2]);
+  for (Int_t c = 0; c < fBmodControlPar[2]; c++) {
     fTrimResponse[c].SetElementName(Form("bmod_trim%d", c + 1));
     fTrimResponse[c].LoadMockDataParameters();
+  }
+
+   fBmodCoilAmp.assign(fBmodControlPar[2], 0.0);
+  for (Int_t c = 0; c < fBmodControlPar[2]; c++) {
+    QwBPMTansferMatrix amp;
+    amp.SetElementName(Form("coil%d", c + 1));
+    amp.LoadMockDataParameters();
+    fBmodCoilAmp[c] = amp.GetTMatrixElement(0);
   }
  
   fBPMTransfer.clear();
@@ -807,6 +821,39 @@ void QwBeamLine::LoadMockDataParameters(TString mapfile) {
   }
 }
 
+//--------------------------------------------------------------------------------------------------------
+/** Load the beam modulation schedule parameters from the modulation map. */
+void QwBeamLine::LoadBmodControlParameters(TString mapfile) {
+
+  QwParameterFile mapstr(mapfile.Data());
+
+  while (mapstr.ReadNextLine()) {
+    mapstr.TrimComment('!');
+    mapstr.TrimWhitespace();
+    if (mapstr.LineIsEmpty()) continue;
+
+    TString devtype = mapstr.GetTypedNextToken<TString>();
+    devtype.ToLower();
+    devtype.Remove(TString::kBoth,' ');
+
+    if (devtype != "bmodcontrolpar") continue;
+
+    for (size_t i = 0; i < fBmodControlPar.size(); i++)
+      fBmodControlPar[i] = mapstr.GetTypedNextToken<Int_t>();
+
+    QwMessage << "Beam modulation schedule: "
+              << fBmodControlPar[0] << " events/period, "
+              << fBmodControlPar[1] << " periods/coil, "
+              << fBmodControlPar[2] << " coils, "
+              << fBmodControlPar[3] << " cycles/supercycle, idle "
+              << fBmodControlPar[4] << "/" << fBmodControlPar[5]
+              << QwLog::endl;
+    return;
+  }
+
+  QwWarning << "No bmodcontrolpar record in " << mapfile
+            << "; using defaults 8, 50, 7, 6, 400, 800" << QwLog::endl;
+}
 //--------------------------------------------------------------------------------------------------------
 
 /** Parse rotation and gain tokens for a BPM and apply to the instance. */
@@ -1053,22 +1100,23 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
   //    + 800 idle tail    = 1 SUPERCYCLE       = 20000 events
   //====================================================================
 
-  static const Int_t bmodWinPerPeriod    = 8;     // events per sine period
-  static const Int_t bmodPeriodsPerCoil  = 50;    // = BMWmax_period
-  static const Int_t bmodNCoils          = 7;     // bmod_trim1 .. bmod_trim7
-  static const Int_t bmodCyclesPerSuper  = 6;     // rows in the PREX grid plot
+  static const Int_t bmodWinPerPeriod    = fBmodControlPar[0];     // events per sine period
+  static const Int_t bmodPeriodsPerCoil  = fBmodControlPar[1];     // = BMWmax_period
+  static const Int_t bmodNCoils          = fBmodControlPar[2];     // bmod_trim1 .. bmod_trim7
+  static const Int_t bmodCyclesPerSuper  = fBmodControlPar[3];     // rows in the PREX grid plot
+  static const Int_t bmodIdlePerCycle    = fBmodControlPar[4];     //   400
+  static const Int_t bmodIdlePerSuper    = fBmodControlPar[5];     //   800
 
   static const Int_t bmodWinPerCoil      = bmodWinPerPeriod * bmodPeriodsPerCoil;   //   400
   static const Int_t bmodDrivenPerCycle  = bmodNCoils * bmodWinPerCoil;             //  2800
-  static const Int_t bmodIdlePerCycle    = 400;                                     //   400
+  
   static const Int_t bmodWinPerCycle     = bmodDrivenPerCycle + bmodIdlePerCycle;   //  3200
-  static const Int_t bmodIdlePerSuper    = 800;                                     //   800
+  
   static const Int_t bmodSuperCycle      = bmodCyclesPerSuper * bmodWinPerCycle
                                          + bmodIdlePerSuper;                        // 20000
 
   // --- drive amplitude per coil, ADC counts ---------------------------
-  static const Double_t bmodCoilAmp[bmodNCoils] =
-    { 500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 150.0 };
+  const std::vector<Double_t>& bmodCoilAmp = fBmodCoilAmp;
 
   // --- how each coil moves the beam -----------------------------------
   
@@ -1317,8 +1365,7 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
     for (size_t i = 0; i < fStripline.size(); i++) {
  
       //  a BPM with no line in the map has all-zero coefficients
-      if (fBPMTransfer[i].GetTMatrixElement(0) == 0.0 &&
-          fBPMTransfer[i].GetTMatrixElement(7) == 0.0) continue;
+      if (fBPMTransfer[i].IsEmpty()) continue;
  
       const Double_t deltaX = fBPMTransfer[i].GetTMatrixElement(0) * kickX
                             + fBPMTransfer[i].GetTMatrixElement(1) * kickXp
@@ -1332,8 +1379,8 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
                             + fBPMTransfer[i].GetTMatrixElement(8) * kickYp
                             + fBPMTransfer[i].GetTMatrixElement(9) * kickE;
  
-      fStripline[i].get()->addMockOffset(1, deltaX);
-      fStripline[i].get()->addMockOffset(2, deltaY);
+      fStripline[i].get()->setMockValue(1, deltaX);
+      fStripline[i].get()->setMockValue(2, deltaY);
       fStripline[i].get()->ApplyResolutionSmearing();
       fStripline[i].get()->FillRawEventData();
     }
