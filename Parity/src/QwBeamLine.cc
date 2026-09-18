@@ -1120,8 +1120,8 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
 
   // --- how each coil moves the beam -----------------------------------
   
-  static const Double_t bmodPositionScale = 1.0e-4;   // mm per ADC count
-  static const Double_t bmodSlopeScale    = 1.0e-5;   // slope per ADC count
+  static const Double_t bmodPositionScale = 5.0e-6;   // mm per ADC count
+  static const Double_t bmodSlopeScale    = 5.0e-6;   // slope per ADC count
   static const Double_t bmodEnergyScale   = 1.0e-4;   // dE/E per ADC count
  
 
@@ -1336,8 +1336,14 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
  
   //  moved up from the end of the function: the energy is kicked below,
   //  so it must be randomized before that, not after
-  for (size_t i = 0; i < fECalculator.size(); i++)
+  for (size_t i = 0; i < fECalculator.size(); i++) {
     fECalculator[i].RandomizeEventData(helicity, time);
+    
+    //  kick the energy calculator here too, and not later
+    if (bmodIsOn)
+      fECalculator[i].addMockOffset(1, kickE);
+      
+   }
  
   for (size_t i = 0; i < fBPMCombo.size(); i++) {
  
@@ -1348,10 +1354,7 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
       fBPMCombo[i].get()->addMockOffset(2, kickY);    // -> fAbsPos[1], y
       fBPMCombo[i].get()->addMockOffset(3, kickXp);   // -> fSlope[0],  x'
       fBPMCombo[i].get()->addMockOffset(4, kickYp);   // -> fSlope[1],  y'
- 
-      //  kick the energy calculator here too, and not later
-      for (size_t k = 0; k < fECalculator.size(); k++)
-        fECalculator[k].addMockOffset(1, kickE);
+     
  
       fBPMCombo[i].get()->reCalcIntercept();
     }
@@ -1361,30 +1364,30 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
   //  Comment out everything down to "INDIVIDUAL BPMs: END" to leave the
   //  combined BPM and energy calculator behaving exactly as they do now,
   //  with the striplines carrying only their own randomized values.
-  if (bmodIsOn) {
+  //if (bmodIsOn) {
     for (size_t i = 0; i < fStripline.size(); i++) {
  
       //  a BPM with no line in the map has all-zero coefficients
       if (fBPMTransfer[i].IsEmpty()) continue;
  
-      const Double_t deltaX = fBPMTransfer[i].GetTMatrixElement(0) * kickX
+      const Double_t bpmX = fBPMTransfer[i].GetTMatrixElement(0) * kickX
                             + fBPMTransfer[i].GetTMatrixElement(1) * kickXp
                             + fBPMTransfer[i].GetTMatrixElement(2) * kickY
                             + fBPMTransfer[i].GetTMatrixElement(3) * kickYp
                             + fBPMTransfer[i].GetTMatrixElement(4) * kickE;
  
-      const Double_t deltaY = fBPMTransfer[i].GetTMatrixElement(5) * kickX
+      const Double_t bpmY = fBPMTransfer[i].GetTMatrixElement(5) * kickX
                             + fBPMTransfer[i].GetTMatrixElement(6) * kickXp
                             + fBPMTransfer[i].GetTMatrixElement(7) * kickY
                             + fBPMTransfer[i].GetTMatrixElement(8) * kickYp
                             + fBPMTransfer[i].GetTMatrixElement(9) * kickE;
  
-      fStripline[i].get()->setMockValue(1, deltaX);
-      fStripline[i].get()->setMockValue(2, deltaY);
+      fStripline[i].get()->setMockValue(1, bpmX);
+      fStripline[i].get()->setMockValue(2, bpmY);
       fStripline[i].get()->ApplyResolutionSmearing();
       fStripline[i].get()->FillRawEventData();
     }
-  }
+  //}
   //  ===== INDIVIDUAL BPMs: END =====
 }
 //*****************************************************************//

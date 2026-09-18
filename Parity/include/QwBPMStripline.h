@@ -143,10 +143,10 @@ class QwBPMStripline : public VQwBPM {
   
   void    setMockValue(int index, double value) override {
     if (index == 1) {
-      fAbsPos[0].ClearEventData();
+      //fAbsPos[0].ClearEventData();
       fAbsPos[0].AddChannelOffset(value);
     } else if (index == 2) {
-      fAbsPos[1].ClearEventData();
+      //fAbsPos[1].ClearEventData();
       fAbsPos[1].AddChannelOffset(value);
     }
   };
