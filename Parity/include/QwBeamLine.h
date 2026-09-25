@@ -208,6 +208,7 @@ protected:
   std::vector<QwBPMTansferMatrix>   fBPMTransfer;    // parallel to fStripline
   std::vector<Int_t>                fBmodControlPar; // the six schedule numbers
   std::vector<Double_t>             fBmodCoilAmp;    // one per coil
+  QwTargetTrimResponse              fBmodDispersion; // MAT1C01H column 6
 
 
 

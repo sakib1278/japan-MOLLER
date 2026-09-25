@@ -819,6 +819,9 @@ void QwBeamLine::LoadMockDataParameters(TString mapfile) {
     tm.LoadMockDataParameters();
     fBPMTransfer.push_back(tm);
   }
+  
+  fBmodDispersion.SetElementName("target_dispersion");
+  fBmodDispersion.LoadMockDataParameters();
 }
 
 //--------------------------------------------------------------------------------------------------------
@@ -1122,7 +1125,8 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
   
   static const Double_t bmodPositionScale = 5.0e-6;   // mm per ADC count
   static const Double_t bmodSlopeScale    = 5.0e-6;   // slope per ADC count
-  static const Double_t bmodEnergyScale   = 1.0e-4;   // dE/E per ADC count
+  static const Double_t bmodEnergyScale   = 1.0e-7;   // dE/E per ADC count
+  static const Double_t bmodDispersionUnit = 1000.0;   // m -> mm, rad -> mrad, column 6
  
 
   // --- parked values, ADC counts (match mock_parameters_beamline.map) --
@@ -1334,16 +1338,12 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
     kickE  = fTrimResponse[bmodCoil].GetTMatrixElement(4) * bmodDrive * bmodEnergyScale;
   }
  
-  //  moved up from the end of the function: the energy is kicked below,
-  //  so it must be randomized before that, not after
-  for (size_t i = 0; i < fECalculator.size(); i++) {
+  //  dE/E = SL20 modulation (trim7, set on line 1334) + energy jitter
+  for (size_t i = 0; i < fECalculator.size(); i++)
     fECalculator[i].RandomizeEventData(helicity, time);
-    
-    //  kick the energy calculator here too, and not later
-    if (bmodIsOn)
-      fECalculator[i].addMockOffset(1, kickE);
-      
-   }
+ 
+  if (!fECalculator.empty())
+    kickE += fECalculator[0].GetEnergy()->GetValue();
  
   for (size_t i = 0; i < fBPMCombo.size(); i++) {
  
@@ -1354,8 +1354,14 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
       fBPMCombo[i].get()->addMockOffset(2, kickY);    // -> fAbsPos[1], y
       fBPMCombo[i].get()->addMockOffset(3, kickXp);   // -> fSlope[0],  x'
       fBPMCombo[i].get()->addMockOffset(4, kickYp);   // -> fSlope[1],  y'
-     
- 
+      
+      
+      //  energy offset through the MAT1C01H dispersion, every event
+      fBPMCombo[i].get()->addMockOffset(1, fBmodDispersion.GetTMatrixElement(0) * kickE * bmodDispersionUnit);
+      fBPMCombo[i].get()->addMockOffset(3, fBmodDispersion.GetTMatrixElement(1) * kickE * bmodDispersionUnit);
+      fBPMCombo[i].get()->addMockOffset(2, fBmodDispersion.GetTMatrixElement(2) * kickE * bmodDispersionUnit);
+      fBPMCombo[i].get()->addMockOffset(4, fBmodDispersion.GetTMatrixElement(3) * kickE * bmodDispersionUnit);
+      
       fBPMCombo[i].get()->reCalcIntercept();
     }
   }
@@ -1364,23 +1370,33 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
   //  Comment out everything down to "INDIVIDUAL BPMs: END" to leave the
   //  combined BPM and energy calculator behaving exactly as they do now,
   //  with the striplines carrying only their own randomized values.
-  //if (bmodIsOn) {
+  
+  
+    //  full target vector: randomized beam + trim kick
+    Double_t targetX = 0.0, targetXp = 0.0, targetY = 0.0, targetYp = 0.0;
+  if (!fBPMCombo.empty()) {
+    const VQwBPM* bmodTarget = fBPMCombo[0].get();
+    targetX  = bmodTarget->GetPosition(VQwBPM::kXAxis)->GetValue();
+    targetY  = bmodTarget->GetPosition(VQwBPM::kYAxis)->GetValue();
+    targetXp = bmodTarget->GetAngleX()->GetValue();
+    targetYp = bmodTarget->GetAngleY()->GetValue();
+  }
     for (size_t i = 0; i < fStripline.size(); i++) {
  
       //  a BPM with no line in the map has all-zero coefficients
       if (fBPMTransfer[i].IsEmpty()) continue;
  
-      const Double_t bpmX = fBPMTransfer[i].GetTMatrixElement(0) * kickX
-                            + fBPMTransfer[i].GetTMatrixElement(1) * kickXp
-                            + fBPMTransfer[i].GetTMatrixElement(2) * kickY
-                            + fBPMTransfer[i].GetTMatrixElement(3) * kickYp
-                            + fBPMTransfer[i].GetTMatrixElement(4) * kickE;
+      const Double_t bpmX = fBPMTransfer[i].GetTMatrixElement(0) * targetX
+                            + fBPMTransfer[i].GetTMatrixElement(1) * targetXp
+                            + fBPMTransfer[i].GetTMatrixElement(2) * targetY
+                            + fBPMTransfer[i].GetTMatrixElement(3) * targetYp
+                            + fBPMTransfer[i].GetTMatrixElement(4) * kickE * bmodDispersionUnit;;
  
-      const Double_t bpmY = fBPMTransfer[i].GetTMatrixElement(5) * kickX
-                            + fBPMTransfer[i].GetTMatrixElement(6) * kickXp
-                            + fBPMTransfer[i].GetTMatrixElement(7) * kickY
-                            + fBPMTransfer[i].GetTMatrixElement(8) * kickYp
-                            + fBPMTransfer[i].GetTMatrixElement(9) * kickE;
+      const Double_t bpmY = fBPMTransfer[i].GetTMatrixElement(5) * targetX
+                            + fBPMTransfer[i].GetTMatrixElement(6) * targetXp
+                            + fBPMTransfer[i].GetTMatrixElement(7) * targetY
+                            + fBPMTransfer[i].GetTMatrixElement(8) * targetYp
+                            + fBPMTransfer[i].GetTMatrixElement(9) * kickE * bmodDispersionUnit;;
  
       fStripline[i].get()->setMockValue(1, bpmX);
       fStripline[i].get()->setMockValue(2, bpmY);

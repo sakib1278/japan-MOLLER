@@ -13,25 +13,19 @@ coilAmp,	coil5,	500
 coilAmp,	coil6,	500
 coilAmp,	coil7,	150
 
-!Target BPM Response to trim card values
-!device_type,	device_name,	X,	X',	Y,	Y',	E
-!bmodtargetresponse,	bmod_trim1,	-1.00,	0.100,	0.800,	0.05,	0.000
-!bmodtargetresponse,	bmod_trim2,	0.150,	1.000,	0.100,	-0.90,	0.000
-!bmodtargetresponse,	bmod_trim3,	-0.80,	-0.15,	-1.00,	0.10,	0.000
-!bmodtargetresponse,	bmod_trim4,	0.050,	0.900,	0.050,	1.00,	0.000
-!bmodtargetresponse,	bmod_trim5,	1.200,	0.200,	0.500,	0.10,	0.000
-!bmodtargetresponse,	bmod_trim6,	0.200,	-1.10,	0.100,	0.60,	0.000
-!bmodtargetresponse,	bmod_trim7,	0.600,	0.050,	0.300,	0.05,	0.000
 
 
-!device_type,	device_name,	X,	X',	Y,	Y'	E	!magnet
-bmodtargetresponse,	bmod_trim1,	-2.148308066370464e+01,	+9.056601458104988e-01,	+0.000000000000000e+00,	+0.000000000000000e+00,	0.000	!MAT1C01H
+bmodtargetresponse,	bmod_trim1,	-2.413997735939606e+01,	+9.265433560543300e-01,	+0.000000000000000e+00,	+0.000000000000000e+00,	0.000	!MAT1C02H
 bmodtargetresponse,	bmod_trim2,	+0.000000000000000e+00,	+0.000000000000000e+00,	+1.378911384933776e+01,	-1.633517179121604e+00,	0.000	!MAT1C03V
-bmodtargetresponse,	bmod_trim3,	-2.413997735939606e+01,	+9.265433560543300e-01,	+0.000000000000000e+00,	+0.000000000000000e+00,	0.000	!MAT1C02H
+bmodtargetresponse,	bmod_trim3,	+2.197364719808044e+01,	-8.486349304057254e-01,	+0.000000000000000e+00,	+0.000000000000000e+00,	0.000	!MAT1C08H
 bmodtargetresponse,	bmod_trim4,	+0.000000000000000e+00,	+0.000000000000000e+00,	-6.232174750070635e+00,	+4.585060714084140e-01,	0.000	!MAT1C08V
-bmodtargetresponse,	bmod_trim5,	+2.197364719808044e+01,	-8.486349304057254e-01,	+0.000000000000000e+00,	+0.000000000000000e+00,	0.000	!MAT1C08H
+bmodtargetresponse,	bmod_trim5,	+8.687390795666319e+00,	+1.377732746037578e-01,	+0.000000000000000e+00,	+0.000000000000000e+00,	0.000	!MAT1C10H
 bmodtargetresponse,	bmod_trim6,	+0.000000000000000e+00,	+0.000000000000000e+00,	-1.576110338189240e+01,	-4.975810411415681e-01,	0.000	!MAT1C10V
-bmodtargetresponse,	bmod_trim7,	+8.687390795666319e+00,	+1.377732746037578e-01,	+0.000000000000000e+00,	+0.000000000000000e+00,	0.000	!MAT1C10H
+bmodtargetresponse,	bmod_trim7,	+0.000000000000000e+00,	+0.000000000000000e+00,	+0.000000000000000e+00,	+0.000000000000000e+00,	1.000	!energy (need to check) 
+
+
+bmodtargetresponse,	target_dispersion,	+3.598575355940656e-01,	-3.318593277967227e-02,	-7.749892843676043e-03,	+1.097506756899557e-05,	0.000	!MAT1C01H col 6
+
 
 
 !stripline transfer matrices from RamRM_IMOLLER_to_IPM1C01.txt
