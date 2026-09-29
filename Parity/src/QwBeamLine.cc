@@ -792,8 +792,8 @@ void QwBeamLine::LoadMockDataParameters(TString mapfile) {
   
    //  control parameters, with the documented defaults if the record is missing from the map
    fBmodControlPar.assign(6, 0);
-   fBmodControlPar[0] = 8;   fBmodControlPar[1] = 5;   fBmodControlPar[2] = 7;
-   fBmodControlPar[3] = 6;   fBmodControlPar[4] = 40;  fBmodControlPar[5] = 80;
+   fBmodControlPar[0] = 8;   fBmodControlPar[1] = 50;   fBmodControlPar[2] = 7;
+   fBmodControlPar[3] = 6;   fBmodControlPar[4] = 400;  fBmodControlPar[5] = 800;
    LoadBmodControlParameters("mock_parameters_modulation.map");
 
    fTrimResponse.resize(fBmodControlPar[2]);
@@ -1349,7 +1349,7 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
  
     fBPMCombo[i].get()->RandomizeEventData(helicity, time);
  
-    if (bmodIsOn) {
+    //if (bmodIsOn) {
       fBPMCombo[i].get()->addMockOffset(1, kickX);    // -> fAbsPos[0], x
       fBPMCombo[i].get()->addMockOffset(2, kickY);    // -> fAbsPos[1], y
       fBPMCombo[i].get()->addMockOffset(3, kickXp);   // -> fSlope[0],  x'
@@ -1363,7 +1363,7 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
       fBPMCombo[i].get()->addMockOffset(4, fBmodDispersion.GetTMatrixElement(3) * kickE * bmodDispersionUnit);
       
       fBPMCombo[i].get()->reCalcIntercept();
-    }
+    //}
   }
  
    //  ===== INDIVIDUAL BPMs: START =====
@@ -1390,13 +1390,13 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
                             + fBPMTransfer[i].GetTMatrixElement(1) * targetXp
                             + fBPMTransfer[i].GetTMatrixElement(2) * targetY
                             + fBPMTransfer[i].GetTMatrixElement(3) * targetYp
-                            + fBPMTransfer[i].GetTMatrixElement(4) * kickE * bmodDispersionUnit;;
+                            + fBPMTransfer[i].GetTMatrixElement(4) * kickE * bmodDispersionUnit;
  
       const Double_t bpmY = fBPMTransfer[i].GetTMatrixElement(5) * targetX
                             + fBPMTransfer[i].GetTMatrixElement(6) * targetXp
                             + fBPMTransfer[i].GetTMatrixElement(7) * targetY
                             + fBPMTransfer[i].GetTMatrixElement(8) * targetYp
-                            + fBPMTransfer[i].GetTMatrixElement(9) * kickE * bmodDispersionUnit;;
+                            + fBPMTransfer[i].GetTMatrixElement(9) * kickE * bmodDispersionUnit;
  
       fStripline[i].get()->setMockValue(1, bpmX);
       fStripline[i].get()->setMockValue(2, bpmY);
