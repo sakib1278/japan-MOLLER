@@ -14,6 +14,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <cmath>
+#include "TMath.h"
 
 #ifdef HAS_RNTUPLE_SUPPORT
 // ROOT headers for RNTuple support
@@ -803,11 +804,15 @@ void QwBeamLine::LoadMockDataParameters(TString mapfile) {
   }
 
    fBmodCoilAmp.assign(fBmodControlPar[2], 0.0);
+   fBmodKickX.assign(fBmodControlPar[2], 0.0);
+   fBmodKickY.assign(fBmodControlPar[2], 0.0);
   for (Int_t c = 0; c < fBmodControlPar[2]; c++) {
     QwBPMTansferMatrix amp;
     amp.SetElementName(Form("coil%d", c + 1));
     amp.LoadMockDataParameters();
-    fBmodCoilAmp[c] = amp.GetTMatrixElement(0);
+    fBmodCoilAmp[c] = amp.GetTMatrixElement(0, 0);
+    fBmodKickX[c]   = amp.GetTMatrixElement(0, 1);
+    fBmodKickY[c]   = amp.GetTMatrixElement(0, 2);
   }
  
   fBPMTransfer.clear();
@@ -1123,7 +1128,6 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
 
   // --- how each coil moves the beam -----------------------------------
   
-  static const Double_t bmodPositionScale = 5.0e-6;   // mm per ADC count
   static const Double_t bmodSlopeScale    = 5.0e-6;   // slope per ADC count
   static const Double_t bmodEnergyScale   = 1.0e-7;   // dE/E per ADC count
   static const Double_t bmodDispersionUnit = 1000.0;   // m -> mm, rad -> mrad, column 6
@@ -1192,13 +1196,13 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
   Double_t bmodDrive     = 0.0;    // ADC counts of deviation on the driven coil
 
   if (bmodIsOn) {
-    const Double_t bmodTwoPi = 6.283185307179586;
+    //const Double_t bmodTwoPi = 6.283185307179586;
 
     // sample at the centre of the window, times the integrating-ADC
     // window-averaging factor sin(pi/N)/(pi/N)
-    const Double_t bmodPhase  = bmodTwoPi * (bmodPhaseStep + 0.5) / bmodWinPerPeriod;
-    const Double_t bmodWinAvg = std::sin(bmodTwoPi / (2.0 * bmodWinPerPeriod))
-                              / (bmodTwoPi / (2.0 * bmodWinPerPeriod));
+    const Double_t bmodPhase  = TMath::TwoPi() * (bmodPhaseStep + 0.5) / bmodWinPerPeriod;
+    const Double_t bmodWinAvg = std::sin(TMath::Pi() / bmodWinPerPeriod)
+                              / (TMath::Pi() / bmodWinPerPeriod);
     bmodSine  = std::sin(bmodPhase) * bmodWinAvg;
     bmodDrive = bmodCoilAmp[bmodCoil] * bmodSine;
 
@@ -1331,11 +1335,18 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
      Double_t kickX = 0.0, kickY = 0.0, kickXp = 0.0, kickYp = 0.0, kickE = 0.0;
  
   if (bmodIsOn) {
-    kickX  = fTrimResponse[bmodCoil].GetTMatrixElement(0) * bmodDrive * bmodPositionScale;
-    kickXp = fTrimResponse[bmodCoil].GetTMatrixElement(1) * bmodDrive * bmodSlopeScale;
-    kickY  = fTrimResponse[bmodCoil].GetTMatrixElement(2) * bmodDrive * bmodPositionScale;
-    kickYp = fTrimResponse[bmodCoil].GetTMatrixElement(3) * bmodDrive * bmodSlopeScale;
-    kickE  = fTrimResponse[bmodCoil].GetTMatrixElement(4) * bmodDrive * bmodEnergyScale;
+    const Double_t kickXpCoil = bmodDrive * bmodSlopeScale * fBmodKickX[bmodCoil];   // x' kick at the coil, mrad
+    const Double_t kickYpCoil = bmodDrive * bmodSlopeScale * fBmodKickY[bmodCoil];   // y' kick at the coil, mrad
+    
+    kickX  = fTrimResponse[bmodCoil].GetTMatrixElement(0, 0) * kickXpCoil
+           + fTrimResponse[bmodCoil].GetTMatrixElement(1, 0) * kickYpCoil;
+    kickXp = fTrimResponse[bmodCoil].GetTMatrixElement(0, 1) * kickXpCoil
+           + fTrimResponse[bmodCoil].GetTMatrixElement(1, 1) * kickYpCoil;
+    kickY  = fTrimResponse[bmodCoil].GetTMatrixElement(0, 2) * kickXpCoil
+           + fTrimResponse[bmodCoil].GetTMatrixElement(1, 2) * kickYpCoil;
+    kickYp = fTrimResponse[bmodCoil].GetTMatrixElement(0, 3) * kickXpCoil
+           + fTrimResponse[bmodCoil].GetTMatrixElement(1, 3) * kickYpCoil;
+    kickE  = fTrimResponse[bmodCoil].GetTMatrixElement(0, 4) * bmodDrive * bmodEnergyScale;
   }
  
   //  dE/E = SL20 modulation (trim7, set on line 1334) + energy jitter
@@ -1343,7 +1354,7 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
     fECalculator[i].RandomizeEventData(helicity, time);
  
   if (!fECalculator.empty())
-    kickE += fECalculator[0].GetEnergy()->GetValue();
+    kickE = fECalculator[0].GetEnergy()->GetValue();
  
   for (size_t i = 0; i < fBPMCombo.size(); i++) {
  
@@ -1357,10 +1368,10 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
       
       
       //  energy offset through the MAT1C01H dispersion, every event
-      fBPMCombo[i].get()->addMockOffset(1, fBmodDispersion.GetTMatrixElement(0) * kickE * bmodDispersionUnit);
-      fBPMCombo[i].get()->addMockOffset(3, fBmodDispersion.GetTMatrixElement(1) * kickE * bmodDispersionUnit);
-      fBPMCombo[i].get()->addMockOffset(2, fBmodDispersion.GetTMatrixElement(2) * kickE * bmodDispersionUnit);
-      fBPMCombo[i].get()->addMockOffset(4, fBmodDispersion.GetTMatrixElement(3) * kickE * bmodDispersionUnit);
+      fBPMCombo[i].get()->addMockOffset(1, fBmodDispersion.GetTMatrixElement(0, 0) * kickE * bmodDispersionUnit);
+      fBPMCombo[i].get()->addMockOffset(3, fBmodDispersion.GetTMatrixElement(0, 1) * kickE * bmodDispersionUnit);
+      fBPMCombo[i].get()->addMockOffset(2, fBmodDispersion.GetTMatrixElement(0, 2) * kickE * bmodDispersionUnit);
+      fBPMCombo[i].get()->addMockOffset(4, fBmodDispersion.GetTMatrixElement(0, 3) * kickE * bmodDispersionUnit);
       
       fBPMCombo[i].get()->reCalcIntercept();
     //}
@@ -1386,17 +1397,17 @@ void QwBeamLine::RandomizeEventData(int helicity, double time)
       //  a BPM with no line in the map has all-zero coefficients
       if (fBPMTransfer[i].IsEmpty()) continue;
  
-      const Double_t bpmX = fBPMTransfer[i].GetTMatrixElement(0) * targetX
-                            + fBPMTransfer[i].GetTMatrixElement(1) * targetXp
-                            + fBPMTransfer[i].GetTMatrixElement(2) * targetY
-                            + fBPMTransfer[i].GetTMatrixElement(3) * targetYp
-                            + fBPMTransfer[i].GetTMatrixElement(4) * kickE * bmodDispersionUnit;
+      const Double_t bpmX = fBPMTransfer[i].GetTMatrixElement(0, 0) * targetX
+                            + fBPMTransfer[i].GetTMatrixElement(0, 1) * targetXp
+                            + fBPMTransfer[i].GetTMatrixElement(0, 2) * targetY
+                            + fBPMTransfer[i].GetTMatrixElement(0, 3) * targetYp
+                            + fBPMTransfer[i].GetTMatrixElement(0, 4) * kickE * bmodDispersionUnit;
  
-      const Double_t bpmY = fBPMTransfer[i].GetTMatrixElement(5) * targetX
-                            + fBPMTransfer[i].GetTMatrixElement(6) * targetXp
-                            + fBPMTransfer[i].GetTMatrixElement(7) * targetY
-                            + fBPMTransfer[i].GetTMatrixElement(8) * targetYp
-                            + fBPMTransfer[i].GetTMatrixElement(9) * kickE * bmodDispersionUnit;
+      const Double_t bpmY = fBPMTransfer[i].GetTMatrixElement(1, 0) * targetX
+                            + fBPMTransfer[i].GetTMatrixElement(1, 1) * targetXp
+                            + fBPMTransfer[i].GetTMatrixElement(1, 2) * targetY
+                            + fBPMTransfer[i].GetTMatrixElement(1, 3) * targetYp
+                            + fBPMTransfer[i].GetTMatrixElement(1, 4) * kickE * bmodDispersionUnit;
  
       fStripline[i].get()->setMockValue(1, bpmX);
       fStripline[i].get()->setMockValue(2, bpmY);

@@ -39,9 +39,9 @@ void QwBPMTansferMatrix::SetElementName(TString bpmName){
 	this->name = bpmName;
 }
 
-void QwBPMTansferMatrix::SetTMatrixElement(Int_t i, Double_t value){
-	if(i >= 0 && i < 10){
-		this->TMatrixElement[i] = value;
+void QwBPMTansferMatrix::SetTMatrixElement(Int_t row, Int_t col, Double_t value){
+	if(row >= 0 && row < 2 && col >= 0 && col < 5){
+		this->TMatrixElement[row][col] = value;
 		this->fFilled = kTRUE;
 	}
 }
@@ -50,8 +50,8 @@ TString QwBPMTansferMatrix::GetElementName(){
 	return name;
 }
 
-Double_t QwBPMTansferMatrix::GetTMatrixElement(Int_t i){
-	return TMatrixElement[i];
+Double_t QwBPMTansferMatrix::GetTMatrixElement(Int_t row, Int_t col){
+	return TMatrixElement[row][col];
 }
 
 void QwBPMTansferMatrix::LoadMockDataParameters(){
@@ -89,31 +89,27 @@ void QwBPMTansferMatrix::LoadMockDataParameters(){
     
     if(devname != this->GetElementName()) continue;
     	
-    if(devtype == "bmodtargetresponse"){
-    		for(int i = 0; i < 5; i++){
-    			this->SetTMatrixElement(i,mapstr.GetTypedNextToken<Double_t>());
-    		}
-    	}
     	
-    	else if (devtype == "coilamp"){
-			this->SetTMatrixElement(0, mapstr.GetTypedNextToken<Double_t>());
+    if (devtype == "coilamp"){
+    		for(int i = 0; i < 3; i++)
+			this->SetTMatrixElement(0, i, mapstr.GetTypedNextToken<Double_t>());
 		}
 		else if (devtype == "bpmtransfermatrix"){
 			rownum = mapstr.GetTypedNextToken<TString>();
 			rownum.ToLower();
 			rownum.Remove(TString::kBoth,' ');
  
-			Int_t offset = -1;
-			if (rownum == "r1") offset = 0;
-			else if (rownum == "r3") offset = 5;
+			Int_t row = -1;
+			if (rownum == "x") row = 0;
+			else if (rownum == "y") row = 1;
  
-			if (offset < 0){
+			if (row < 0){
 				QwWarning << "Unknown transfer matrix row '" << rownum
 				          << "' for " << devname << QwLog::endl;
 				continue;
 			}
 			for(int i = 0; i < 5; i++)
-				this->SetTMatrixElement(offset + i,
+				this->SetTMatrixElement(row, i,
 				                        mapstr.GetTypedNextToken<Double_t>());
 			continue;      // a BPM has TWO lines, keep reading for the other
 		}
@@ -121,7 +117,7 @@ void QwBPMTansferMatrix::LoadMockDataParameters(){
  
 		if (ldebug){
 			std::cout << "QwBPMTansferMatrix: " << devname << " (" << devtype << ")";
-			for(int i = 0; i < 10; i++) std::cout << "  " << GetTMatrixElement(i);
+			for(int r = 0; r < 2; r++) for(int i = 0; i < 5; i++) std::cout << "  " << GetTMatrixElement(r, i);
 			std::cout << std::endl;
 		}
 		return;

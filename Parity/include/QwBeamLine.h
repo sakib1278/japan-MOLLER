@@ -204,11 +204,13 @@ protected:
   std::vector <QwEnergyCalculator> fECalculator;
   std::vector <QwBeamDetectorID> fBeamDetectorID;
   
-  std::vector<QwTargetTrimResponse> fTrimResponse;   // 7 entries, index = coil-1
+  std::vector<QwBPMTansferMatrix>   fTrimResponse;   // 7 entries, index = coil-1
   std::vector<QwBPMTansferMatrix>   fBPMTransfer;    // parallel to fStripline
   std::vector<Int_t>                fBmodControlPar; // the six schedule numbers
   std::vector<Double_t>             fBmodCoilAmp;    // one per coil
-  QwTargetTrimResponse              fBmodDispersion; // MAT1C01H column 6
+  std::vector<Double_t>             fBmodKickX;      // fraction of kick in x'
+  std::vector<Double_t>             fBmodKickY;      // fraction of kick in y'
+  QwBPMTansferMatrix                fBmodDispersion; // MAT1C01H column 6
 
 
 
