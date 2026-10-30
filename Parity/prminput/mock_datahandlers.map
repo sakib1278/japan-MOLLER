@@ -64,8 +64,18 @@
   map  = mock_det_combiner.map
   tree-name  = avgs
   tree-comment = Averages of detector combinations
+<<<<<<< HEAD
 
 [QwTrendHandler]
   name = trend
   priority = 100
   map  = mock_trend.map
+=======
+  
+[QwExtractor]
+  name       = BMWExtractor
+  priority   = 0
+  scope      = event
+  tree-name  = bmw
+  tree-comment = Bmod Data
+>>>>>>> 97624743... Modulated Data Extracted to evt_bmw

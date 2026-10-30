@@ -53,4 +53,3 @@
  name = Beam Modulation
  map  = mock_moller_beammod.map
  eventcut = mock_moller_beammod_eventcuts.map
-

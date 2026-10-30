@@ -28,7 +28,7 @@ QwExtractor::QwExtractor(const TString& name)
 : VQwDataHandler(name)
 {
   ParseSeparator = ":";
-  fKeepRunningSum = kTRUE;
+  fKeepRunningSum = kFALSE;
   fTreeName = "bmw";
   fTreeComment = "BMOD Extractor";
   fErrorFlagMask = 0x9000;
@@ -70,7 +70,7 @@ void QwExtractor::ConstructTreeBranches(
 {
   // Check if tree name is specified
   if (fTreeName == "") {
-    QwWarning << "QwCorrelator: no tree name specified, use 'tree-name = value'" << QwLog::endl;
+    QwWarning << "QwExtractor: no tree name specified, use 'tree-name = value'" << QwLog::endl;
     return;
   }
 
@@ -100,7 +100,7 @@ void QwExtractor::ProcessData()
 
 void QwExtractor::FillTreeBranches(QwRootFile *treerootfile)
 {
-  if (fTreeName.size()>0 && fLocalFlag == 1 ){
+  if (fTreeName.size()>0 && fLocalFlag == 1 && fSourceCopy != nullptr){
     //QwMessage << fLocalFlag << " passed mask " << "0x" << std::hex<< fErrorFlagMask << std::dec << QwLog::endl;
     treerootfile->FillTreeBranches(*fSourceCopy);
     treerootfile->FillTree(fTreeName);
