@@ -215,7 +215,7 @@ class QwBeamMod: public VQwSubsystemParity, public MQwSubsystemCloneable<QwBeamM
 
   using VQwSubsystem::ConstructBranchAndVector;
   void ConstructBranchAndVector(TTree *tree, TString &prefix, QwRootTreeBranchVector &values) override;
-  void ConstructBranch(TTree *tree, TString& prefix) override { };
+  void ConstructBranch(TTree *tree, TString& prefix) override;
   void ConstructBranch(TTree *tree, TString& prefix, QwParameterFile& trim_file) override { };
   void FillTreeVector(QwRootTreeBranchVector &values) const override;
 #ifdef HAS_RNTUPLE_SUPPORT

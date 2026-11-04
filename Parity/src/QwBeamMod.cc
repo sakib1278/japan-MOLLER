@@ -1002,6 +1002,17 @@ void QwBeamMod::FillTreeVector(QwRootTreeBranchVector &values) const
 
 }
 
+void QwBeamMod::ConstructBranch(TTree *tree, TString& prefix)
+{
+  for (size_t i = 0; i < fModChannel.size(); i++)
+    fModChannel[i]->ConstructBranch(tree, prefix);
+  for (size_t i = 0; i < fWord.size(); i++) {
+    TString basename = prefix + fWord[i].fWordName;
+    tree->Branch(basename, &(fWord[i].fValue), basename + "/I");
+  }
+}
+
+
 #ifdef HAS_RNTUPLE_SUPPORT
 void QwBeamMod::ConstructNTupleAndVector(std::unique_ptr<ROOT::RNTupleModel>& model, TString& prefix, std::vector<Double_t>& values, std::vector<std::shared_ptr<Double_t>>& fieldPtrs)
 {

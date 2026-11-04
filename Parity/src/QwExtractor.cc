@@ -13,6 +13,7 @@
 
 // ROOT headers
 #include "TFile.h"
+#include "TTree.h"
 
 // Qweak headers
 #include "QwOptions.h"
@@ -76,8 +77,20 @@ void QwExtractor::ConstructTreeBranches(
 
   // Construct tree name and create new tree
   fTreeName = treeprefix + fTreeName;
-  treerootfile->ConstructTreeBranches(fTreeName, fTreeComment.c_str(), *fSourceCopy);
+  //treerootfile->ConstructTreeBranches(fTreeName, fTreeComment.c_str(), *fSourceCopy);
   //fTree = treerootfile->GetTree(fTreeName);
+  
+  // Own tree: all subsystems except the injector, one value (hw_sum) per channel
+  treerootfile->cd();
+  fTree = new TTree(fTreeName.c_str(), fTreeComment.c_str());
+  fTree->Branch("CodaEventNumber", &fEventNumber, "CodaEventNumber/i");
+  fTree->Branch("ErrorFlag", &fEventErrorFlag, "ErrorFlag/i");
+  TString prefix = "";
+  for (size_t i = 0; i < fSourceCopy->size(); i++) {
+    if (fSourceCopy->at(i)->GetName().Contains("Injector")) continue;
+    fSourceCopy->at(i)->ConstructBranch(fTree, prefix);
+    }
+
 }
 
 void QwExtractor::ProcessData()
@@ -88,6 +101,8 @@ void QwExtractor::ProcessData()
       //QwMessage << "0x" << std::hex << *fErrorFlagPointer << " passed mask " << "0x" << std::hex << fErrorFlagMask << std::dec << QwLog::endl;
       fLocalFlag = 1;
       fSourceCopy->operator=(*fSourcePointer);
+      fEventNumber = fSourcePointer->GetCodaEventNumber();
+      fEventErrorFlag = *fErrorFlagPointer;
   }// else {
   //    QwMessage << "0x" << std::hex << *fErrorFlagPointer << " failed mask " << "0x" << std::hex << fErrorFlagMask << std::dec << QwLog::endl;
   //  }
@@ -95,6 +110,7 @@ void QwExtractor::ProcessData()
   else{
     fLocalFlag = 1;
     fSourceCopy->operator=(*fSourcePointer);
+    fEventNumber = fSourcePointer->GetCodaEventNumber();
   }
 }
 
@@ -102,8 +118,7 @@ void QwExtractor::FillTreeBranches(QwRootFile *treerootfile)
 {
   if (fTreeName.size()>0 && fLocalFlag == 1 && fSourceCopy != nullptr){
     //QwMessage << fLocalFlag << " passed mask " << "0x" << std::hex<< fErrorFlagMask << std::dec << QwLog::endl;
-    treerootfile->FillTreeBranches(*fSourceCopy);
-    treerootfile->FillTree(fTreeName);
+    if (fTree != nullptr) fTree->Fill();
   }
   //else {
   //  QwMessage << fLocalFlag << " failed mask " << "0x" << fErrorFlagMask << std::dec << QwLog::endl;

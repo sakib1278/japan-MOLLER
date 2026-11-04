@@ -9,6 +9,7 @@
 
 // Parent Class
 #include "VQwDataHandler.h"
+#include "TTree.h"
 
 /**
  * \class QwExtractor
@@ -55,6 +56,9 @@ class QwExtractor:public VQwDataHandler, public MQwDataHandlerCloneable<QwExtrac
     const QwSubsystemArrayParity* fSourcePointer= nullptr;
     QwSubsystemArrayParity* fSourceCopy= nullptr;
     //TTree* fTree;
+    TTree* fTree = nullptr;
+    UInt_t fEventNumber = 0;
+    UInt_t fEventErrorFlag = 0;
 
   private:
     // Default constructor
